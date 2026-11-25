@@ -1,0 +1,5 @@
+/eduos-sync
+/bin/
+*.test
+*.out
+.env
