@@ -11,3 +11,15 @@ func TestPgxURL(t *testing.T) {
 		t.Error("empty URL accepted")
 	}
 }
+
+func TestAPIURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"osun-eduos-api:10000":    "http://osun-eduos-api:10000",
+		"https://api.example.ng/": "https://api.example.ng",
+		" http://localhost:3000 ": "http://localhost:3000",
+	} {
+		if got := APIURL(in); got != want {
+			t.Errorf("APIURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

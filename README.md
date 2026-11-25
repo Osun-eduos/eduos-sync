@@ -66,7 +66,9 @@ go run ./cmd/eduos-sync
 curl localhost:4000/healthz
 ```
 
-Or with Docker: `docker build -t eduos-sync .` and run it with the same variables.
+Or with Docker: `docker build -t eduos-sync .` and run it with the same variables. `API_URL` can be a full URL or a private-network `host:port`.
+
+For a hosted pilot, the [`render.yaml`](https://github.com/Osun-eduos/eduos-api/blob/main/render.yaml) Blueprint in eduos-api deploys this service with the database and the API; see the [deployment guide](https://github.com/Osun-eduos/osun-eduos/blob/main/docs/deployment.md).
 
 ## Tests
 

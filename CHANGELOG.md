@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-11-25
+
+### Changed
+- `API_URL` may be a private-network `host:port`, as Render provides; `http://` is added.
+
 ## [0.1.0] - 2026-11-25
 
 ### Added

@@ -25,7 +25,7 @@ func Load() (Config, error) {
 	c := Config{
 		Port:         env("PORT", "4000"),
 		JWTSecret:    os.Getenv("JWT_ACCESS_SECRET"),
-		APIURL:       strings.TrimRight(env("API_URL", "http://localhost:3000"), "/"),
+		APIURL:       APIURL(env("API_URL", "http://localhost:3000")),
 		RegisterDays: envInt("SNAPSHOT_REGISTER_DAYS", 14),
 		MaxEvents:    envInt("SYNC_MAX_EVENTS", 200),
 		MaxBodyBytes: int64(envInt("SYNC_MAX_BODY_BYTES", 2<<20)),
@@ -39,6 +39,15 @@ func Load() (Config, error) {
 	}
 	c.DatabaseURL = db
 	return c, nil
+}
+
+// APIURL accepts a full URL or a private-network host:port (as Render's hostport gives), which gets http://.
+func APIURL(raw string) string {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	return raw
 }
 
 // PgxURL converts a Prisma connection string into one pgx accepts.
