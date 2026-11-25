@@ -56,7 +56,7 @@ func seed(t *testing.T, s *Store, today time.Time) {
 		sql  string
 		args []any
 	}{
-		{`TRUNCATE "SyncEvent", "Score", "ScoreSheet", "ClassSubject", "ClassResult", "ReportRemark", "Term", "AttendanceMark", "AttendanceRegister", "AuditLog", "RefreshToken", "Transfer", "StudentGuardian", "ClassPlacement", "Enrolment", "Student", "ClassArm", "AcademicSession", "Counter", "User", "School" CASCADE`, nil},
+		{`TRUNCATE "Holiday", "SyncEvent", "Score", "ScoreSheet", "ClassSubject", "ClassResult", "ReportRemark", "Term", "AttendanceMark", "AttendanceRegister", "AuditLog", "RefreshToken", "Transfer", "StudentGuardian", "ClassPlacement", "Enrolment", "Student", "ClassArm", "AcademicSession", "Counter", "User", "School" CASCADE`, nil},
 		{`INSERT INTO "School" (id, code, name, lga, level, ownership, "updatedAt") VALUES ($1, 'OS/ILE/COM/0001', 'Ilesa Grammar School', 'Ilesa East', 'JUNIOR_AND_SENIOR', 'PUBLIC', now())`, []any{school}},
 		{`INSERT INTO "User" (id, "fullName", email, role, "schoolId", "passwordHash", "mustChangePassword", "updatedAt") VALUES ($1, 'Grace Akinola', 'g@x.test', 'TEACHER', $2, 'x', false, now()), ($3, 'Segun Ojo', 's@x.test', 'TEACHER', $2, 'x', false, now())`, []any{teacher, school, other}},
 		{`INSERT INTO "AcademicSession" (id, name, "startDate", "endDate", "isCurrent") VALUES ($1, '2030/2031', $2, $3, true)`, []any{session, d(-60), d(200)}},
@@ -73,6 +73,7 @@ func seed(t *testing.T, s *Store, today time.Time) {
 		{`INSERT INTO "ScoreSheet" (id, "classSubjectId", "termId", status, "returnNote", "updatedAt") VALUES ($1, $2, $3, 'RETURNED', 'Check Ada', now())`, []any{sheet, mth, term}},
 		{`INSERT INTO "Score" (id, "sheetId", "studentId", marks, total, "updatedAt") VALUES (gen_random_uuid(), $1, $2, '{"CA1":18,"CA2":17,"EXAM":50}', 85, now()), (gen_random_uuid(), $1, $3, '{"CA1":10,"CA2":null,"EXAM":null}', NULL, now())`, []any{sheet, ada, bola}},
 		{`INSERT INTO "AttendanceRegister" (id, "classArmId", date, "takenById", "updatedAt") VALUES ($1, $3, $4, $5, now()), ($2, $3, $6, $5, now())`, []any{reg, oldReg, jss2a, d(-1), teacher, d(-30)}},
+		{`INSERT INTO "Holiday" (id, name, "startDate", "endDate") VALUES (gen_random_uuid(), 'Mid-term break', $1, $2), (gen_random_uuid(), 'Old holiday', $3, $3)`, []any{d(3), d(5), d(-400)}},
 		{`INSERT INTO "AttendanceMark" (id, "registerId", "studentId", status, note) VALUES (gen_random_uuid(), $1, $3, 'PRESENT', NULL), (gen_random_uuid(), $1, $4, 'ABSENT', 'Sick'), (gen_random_uuid(), $2, $3, 'PRESENT', NULL)`, []any{reg, oldReg, ada, bola}},
 	}
 	for _, st := range stmts {
@@ -113,6 +114,9 @@ func TestSnapshotAgainstDatabase(t *testing.T) {
 	m := snap.Subjects[0]
 	if m.Sheet == nil || m.Sheet.Status != "RETURNED" || *m.Sheet.ReturnNote != "Check Ada" || len(m.Sheet.Scores) != 2 || m.Released {
 		t.Errorf("maths sheet: %+v", m.Sheet)
+	}
+	if len(snap.Holidays) != 1 || snap.Holidays[0].Name != "Mid-term break" || snap.Holidays[0].EndDate != today.AddDate(0, 0, 5).Format(day) {
+		t.Errorf("holidays (only this session's): %+v", snap.Holidays)
 	}
 	if b := snap.Subjects[1]; b.Sheet != nil || len(b.Students) != 0 {
 		t.Errorf("biology: %+v", b)

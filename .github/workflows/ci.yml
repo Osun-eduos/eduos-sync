@@ -24,16 +24,16 @@ jobs:
     env:
       SYNC_TEST_DATABASE_URL: postgresql://eduos:eduos@localhost:5432/eduos_test?schema=public
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       # The database schema belongs to eduos-api. Apply its migrations so the store tests run against the real schema.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Osun-eduos/eduos-api
           path: eduos-api
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Apply eduos-api migrations

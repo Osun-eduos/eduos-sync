@@ -22,6 +22,15 @@ type Snapshot struct {
 	Term        *SnapTerm   `json:"term"`
 	Classes     []SnapClass `json:"classes"`
 	Subjects    []SnapSubj  `json:"subjects"`
+	// Holidays in the current session. Registers are not taken on these days.
+	Holidays []SnapHoliday `json:"holidays"`
+}
+
+// SnapHoliday is a state-wide non-school day set by the Ministry. EndDate equals StartDate for a one-day holiday.
+type SnapHoliday struct {
+	Name      string `json:"name"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
 }
 
 type SnapUser struct {
@@ -115,7 +124,7 @@ func fullName(surname, first string, middle *string) string {
 
 // Snapshot builds the offline working set for a teacher. subjectName maps subject codes to names.
 func (s *Store) Snapshot(ctx context.Context, userID string, registerDays int, today time.Time, subjectName func(string) string) (*Snapshot, error) {
-	snap := &Snapshot{GeneratedAt: time.Now().UTC(), Classes: []SnapClass{}, Subjects: []SnapSubj{}}
+	snap := &Snapshot{GeneratedAt: time.Now().UTC(), Classes: []SnapClass{}, Subjects: []SnapSubj{}, Holidays: []SnapHoliday{}}
 	var schoolID, schoolName *string
 	var active bool
 	err := s.db.QueryRow(ctx, `SELECT u.id, u."fullName", u.role::text, u."isActive", u."schoolId", sc.name FROM "User" u LEFT JOIN "School" sc ON sc.id = u."schoolId" WHERE u.id = $1`, userID).
@@ -141,6 +150,25 @@ func (s *Store) Snapshot(ctx context.Context, userID string, registerDays int, t
 	}
 	sess.StartDate, sess.EndDate = start.Format(day), end.Format(day)
 	snap.Session = &sess
+
+	hrows, err := s.db.Query(ctx, `SELECT name, "startDate", "endDate" FROM "Holiday" WHERE "startDate" <= $2 AND "endDate" >= $1 ORDER BY "startDate"`, start, end)
+	if err != nil {
+		return nil, err
+	}
+	for hrows.Next() {
+		var h SnapHoliday
+		var hs, he time.Time
+		if err := hrows.Scan(&h.Name, &hs, &he); err != nil {
+			hrows.Close()
+			return nil, err
+		}
+		h.StartDate, h.EndDate = hs.Format(day), he.Format(day)
+		snap.Holidays = append(snap.Holidays, h)
+	}
+	hrows.Close()
+	if err := hrows.Err(); err != nil {
+		return nil, err
+	}
 
 	var term SnapTerm
 	var termEnd time.Time

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0] - 2026-11-25
+
+### Added
+- The snapshot includes the current session's holidays, so the app does not offer registers on those days.
+
 ## [0.1.1] - 2026-11-25
 
 ### Changed
