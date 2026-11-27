@@ -3,7 +3,12 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
 	"log/slog"
@@ -20,7 +25,26 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const secret = "test-secret-test-secret-test-secret-123"
+// One signing key for the whole test run, as eduos-api would hold; the server gets only its public half.
+var signingKey, publicKeyPEM = func() (*ecdsa.PrivateKey, string) {
+	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	der, err := x509.MarshalPKIXPublicKey(&k.PublicKey)
+	if err != nil {
+		panic(err)
+	}
+	return k, string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+}()
+
+func verifier() *auth.Verifier {
+	v, err := auth.NewVerifier(publicKeyPEM)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
 
 type fakeStore struct {
 	mu     sync.Mutex
@@ -74,14 +98,14 @@ func (fakeRefs) Get(context.Context, string) (*apiclient.Reference, error) {
 
 func token(t *testing.T, sub, role string, mcp bool) string {
 	t.Helper()
-	s, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": sub, "role": role, "sid": "s1", "mcp": mcp, "iss": "eduos-api", "exp": time.Now().Add(time.Minute).Unix()}).SignedString([]byte(secret))
+	s, _ := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{"sub": sub, "role": role, "sid": "s1", "mcp": mcp, "iss": "eduos-api", "exp": time.Now().Add(time.Minute).Unix()}).SignedString(signingKey)
 	return s
 }
 
 func setup(respond func(method, path string) (apiclient.Response, error)) (*Server, *fakeStore, *fakeAPI) {
 	st := &fakeStore{events: map[string]store.Event{}, sheets: map[string]string{"11111111-1111-4111-8111-111111111111": "sheet-1"}}
 	api := &fakeAPI{respond: respond}
-	return &Server{Store: st, API: api, Refs: fakeRefs{}, Verifier: auth.NewVerifier(secret), RegisterDays: 14, MaxEvents: 5, MaxBodyBytes: 1 << 20, Now: time.Now, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, st, api
+	return &Server{Store: st, API: api, Refs: fakeRefs{}, Verifier: verifier(), RegisterDays: 14, MaxEvents: 5, MaxBodyBytes: 1 << 20, Now: time.Now, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, st, api
 }
 
 func ok(string, string) (apiclient.Response, error) {

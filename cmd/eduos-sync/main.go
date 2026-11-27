@@ -35,9 +35,14 @@ func main() {
 	}
 	defer db.Close()
 
+	verifier, err := auth.NewVerifier(cfg.JWTPublicKey)
+	if err != nil {
+		log.Error("config", "error", err)
+		os.Exit(1)
+	}
 	api := apiclient.New(cfg.APIURL)
 	srv := &server.Server{
-		Store: db, API: api, Refs: apiclient.NewReferenceCache(api), Verifier: auth.NewVerifier(cfg.JWTSecret),
+		Store: db, API: api, Refs: apiclient.NewReferenceCache(api), Verifier: verifier,
 		RegisterDays: cfg.RegisterDays, MaxEvents: cfg.MaxEvents, MaxBodyBytes: cfg.MaxBodyBytes, Now: time.Now, Log: log,
 	}
 	httpSrv := &http.Server{

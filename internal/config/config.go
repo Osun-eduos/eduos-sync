@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Port         string
 	DatabaseURL  string
-	JWTSecret    string
+	JWTPublicKey string
 	APIURL       string
 	RegisterDays int
 	MaxEvents    int
@@ -24,14 +24,14 @@ type Config struct {
 func Load() (Config, error) {
 	c := Config{
 		Port:         env("PORT", "4000"),
-		JWTSecret:    os.Getenv("JWT_ACCESS_SECRET"),
+		JWTPublicKey: os.Getenv("JWT_PUBLIC_KEY"),
 		APIURL:       APIURL(env("API_URL", "http://localhost:3000")),
 		RegisterDays: envInt("SNAPSHOT_REGISTER_DAYS", 14),
 		MaxEvents:    envInt("SYNC_MAX_EVENTS", 200),
 		MaxBodyBytes: int64(envInt("SYNC_MAX_BODY_BYTES", 2<<20)),
 	}
-	if len(c.JWTSecret) < 32 {
-		return c, errors.New("JWT_ACCESS_SECRET must be set to the same value as eduos-api (at least 32 characters)")
+	if strings.TrimSpace(c.JWTPublicKey) == "" {
+		return c, errors.New("JWT_PUBLIC_KEY must be set to eduos-api's public key (see the eduos-api README)")
 	}
 	db, err := PgxURL(os.Getenv("DATABASE_URL"))
 	if err != nil {
