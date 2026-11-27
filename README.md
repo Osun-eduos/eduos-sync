@@ -53,14 +53,14 @@ Event ids are UUIDs generated on the phone and never reused. At most 200 events 
 
 ## Sign-in
 
-The app signs in with **eduos-api**, not with this service. It sends `X-Client: mobile` to `POST /auth/login`, and gets the refresh token in the response body instead of a cookie. It keeps that token in encrypted storage and calls `POST /auth/refresh` with `{ "refreshToken": "…" }` when the 15-minute access token expires. This service only checks access tokens, using the same secret as eduos-api. Only teachers can use it, and accounts still on a temporary password are refused until the password is changed.
+The app signs in with **eduos-api**, not with this service. It sends `X-Client: mobile` to `POST /auth/login`, and gets the refresh token in the response body instead of a cookie. It keeps that token in encrypted storage and calls `POST /auth/refresh` with `{ "refreshToken": "…" }` when the 15-minute access token expires. This service only checks access tokens, with eduos-api's public key (ES256): it can verify a token but could never sign one. Only teachers can use it, and accounts still on a temporary password are refused until the password is changed.
 
 ## Run locally
 
 You need Go 1.24 and a database migrated by eduos-api (`npx prisma migrate deploy` in eduos-api).
 
 ```sh
-cp .env.example .env   # set the same JWT_ACCESS_SECRET as eduos-api
+cp .env.example .env   # set JWT_PUBLIC_KEY to eduos-api's public key
 set -a; . ./.env; set +a
 go run ./cmd/eduos-sync
 curl localhost:4000/healthz

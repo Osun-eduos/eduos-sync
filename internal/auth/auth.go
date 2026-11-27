@@ -1,9 +1,14 @@
-// Package auth checks access tokens issued by eduos-api. The sync service never issues tokens of its own.
+// Package auth checks access tokens issued by eduos-api. The sync service never issues tokens of its own: it holds
+// only eduos-api's public key, so even if this service were compromised it could not sign a token.
 package auth
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -26,21 +31,41 @@ type claims struct {
 var ErrInvalid = errors.New("your session has expired; please sign in again")
 
 type Verifier struct {
-	secret []byte
+	key    *ecdsa.PublicKey
 	parser *jwt.Parser
 }
 
-// NewVerifier accepts only HS256 tokens from the eduos-api issuer, with an expiry.
-func NewVerifier(secret string) *Verifier {
-	return &Verifier{
-		secret: []byte(secret),
-		parser: jwt.NewParser(jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer("eduos-api"), jwt.WithExpirationRequired()),
+// PEM accepts a PEM block as it is usually put in an environment variable: as is, with "\n" written as two
+// characters, or base64-encoded.
+func PEM(raw string) []byte {
+	s := strings.TrimSpace(raw)
+	if !strings.HasPrefix(s, "-----BEGIN") {
+		if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+			s = strings.TrimSpace(string(b))
+		}
 	}
+	return []byte(strings.ReplaceAll(s, `\n`, "\n"))
+}
+
+// NewVerifier accepts only ES256 tokens from the eduos-api issuer, with an expiry, signed by the private key that
+// matches publicKey (a P-256 public key in PEM form).
+func NewVerifier(publicKey string) (*Verifier, error) {
+	key, err := jwt.ParseECPublicKeyFromPEM(PEM(publicKey))
+	if err != nil {
+		return nil, fmt.Errorf("JWT_PUBLIC_KEY is not a valid EC public key: %w", err)
+	}
+	if key.Curve != elliptic.P256() {
+		return nil, errors.New("JWT_PUBLIC_KEY must be a P-256 (ES256) key")
+	}
+	return &Verifier{
+		key:    key,
+		parser: jwt.NewParser(jwt.WithValidMethods([]string{"ES256"}), jwt.WithIssuer("eduos-api"), jwt.WithExpirationRequired()),
+	}, nil
 }
 
 func (v *Verifier) Verify(token string) (User, error) {
 	var c claims
-	_, err := v.parser.ParseWithClaims(token, &c, func(*jwt.Token) (any, error) { return v.secret, nil })
+	_, err := v.parser.ParseWithClaims(token, &c, func(*jwt.Token) (any, error) { return v.key, nil })
 	if err != nil || c.Subject == "" || c.Role == "" {
 		return User{}, fmt.Errorf("%w", ErrInvalid)
 	}
